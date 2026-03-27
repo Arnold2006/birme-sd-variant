@@ -503,6 +503,6 @@ body.auto-size .ratio { display: none; }
 
 .ratio { display: flex; align-items: center; }
 .ratio input { width: 60px !important; }
-.ratio span { margin: 0 6px; color: #5050780; }
+.ratio span { margin: 0 6px; color: #505078; }
 
 label { font-size: 0.83rem; color: #8080a8; }

@@ -13,6 +13,8 @@ function downloadBlob(blob, filename) {
   setTimeout(() => {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+    // Small delay ensures the browser has time to initiate the download
+    // before the object URL is revoked.
   }, 150);
 }
 
