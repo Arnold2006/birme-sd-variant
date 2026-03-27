@@ -8,6 +8,7 @@ class BFile {
     this.extension = file.name.substr(dot_index + 1);
     this.fx = this.fy = 0.5;
     this.is_custom_focal = false;
+    this.crop_scale = 1.0;
     this.url = url;
   }
 
@@ -477,6 +478,7 @@ class Birme {
     });
     holder.data("file", f);
     holder.on("mousedown", this._image_mousedown);
+    holder.on("mousemove", this._image_cursor_update);
     holder.children(".btn-delete").on("click", this.remove_one);
     this.masonry.layout();
   }
@@ -523,15 +525,23 @@ class Birme {
     const h = img.offsetHeight;
     let nw = w;
     let nh = h;
+    const baseFactor = Math.min(w / tw, h / th);
+    const base_nw = tw * baseFactor;
+    const base_nh = th * baseFactor;
     if (!(config.auto_width || config.auto_height || config.no_resize)) {
-      nw = tw * Math.min(w / tw, h / th);
-      nh = th * Math.min(w / tw, h / th);
+      const cropScale = file.crop_scale || 1.0;
+      nw = base_nw * cropScale;
+      nh = base_nh * cropScale;
     }
 
     // Store crop dimensions on the image-holder for use in drag calculations
     const imageHolder = holder.classList.contains("image-holder") ? holder : holder.querySelector(".image-holder");
     $(imageHolder).data("nw", nw);
     $(imageHolder).data("nh", nh);
+    $(imageHolder).data("img_w", w);
+    $(imageHolder).data("img_h", h);
+    $(imageHolder).data("base_nw", base_nw);
+    $(imageHolder).data("base_nh", base_nh);
 
     mask.width = w;
     mask.height = h;
@@ -627,7 +637,7 @@ class Birme {
       th = (img.height * tw) / iw;
     }
 
-    let scale = Math.min(iw / tw, ih / th);
+    let scale = Math.min(iw / tw, ih / th) * (file.crop_scale || 1.0);
     let srcw = tw * scale;
     let srch = th * scale;
 
@@ -810,6 +820,45 @@ class Birme {
     $(".modal").removeClass("show-wm");
   }
 
+  _detect_corner(holder, clientX, clientY) {
+    const nw = holder.data("nw") || holder.width();
+    const nh = holder.data("nh") || holder.height();
+    const imgW = holder.data("img_w") || holder.width();
+    const imgH = holder.data("img_h") || holder.height();
+    const file = holder.data("file");
+    const fx = file.focal_x;
+    const fy = file.focal_y;
+
+    const cropX = (imgW - nw) * fx;
+    const cropY = (imgH - nh) * fy;
+
+    const holderRect = holder.get(0).getBoundingClientRect();
+    const scaleX = imgW / holderRect.width;
+    const scaleY = imgH / holderRect.height;
+    const mouseX = (clientX - holderRect.left) * scaleX;
+    const mouseY = (clientY - holderRect.top) * scaleY;
+
+    const hitSize = 16;
+    if (Math.abs(mouseX - cropX) <= hitSize && Math.abs(mouseY - cropY) <= hitSize) return "tl";
+    if (Math.abs(mouseX - (cropX + nw)) <= hitSize && Math.abs(mouseY - cropY) <= hitSize) return "tr";
+    if (Math.abs(mouseX - cropX) <= hitSize && Math.abs(mouseY - (cropY + nh)) <= hitSize) return "bl";
+    if (Math.abs(mouseX - (cropX + nw)) <= hitSize && Math.abs(mouseY - (cropY + nh)) <= hitSize) return "br";
+    return null;
+  }
+
+  _image_cursor_update(event) {
+    if (config.auto_width || config.auto_height) return;
+    const holder = $(event.currentTarget);
+    const corner = birme._detect_corner(holder, event.clientX, event.clientY);
+    if (corner === "tl" || corner === "br") {
+      holder.css("cursor", "nwse-resize");
+    } else if (corner === "tr" || corner === "bl") {
+      holder.css("cursor", "nesw-resize");
+    } else {
+      holder.css("cursor", "move");
+    }
+  }
+
   _image_mousedown(event) {
     if (config.auto_width || config.auto_height) return;
     let holder = $(event.originalEvent.target);
@@ -817,17 +866,32 @@ class Birme {
       holder = holder.closest(".image-holder");
     }
     let file = holder.data("file");
+
+    const corner = birme._detect_corner(holder, event.clientX, event.clientY);
+    holder.data("corner", corner);
     holder.data("x", event.clientX);
     holder.data("y", event.clientY);
-
     holder.data("fx", file.focal_x);
     holder.data("fy", file.focal_y);
 
-    // Store available drag range so crop box follows mouse precisely
     const nw = holder.data("nw") || holder.width();
     const nh = holder.data("nh") || holder.height();
-    holder.data("avail_w", holder.width() - nw);
-    holder.data("avail_h", holder.height() - nh);
+    const imgW = holder.data("img_w") || holder.width();
+    const imgH = holder.data("img_h") || holder.height();
+
+    if (!corner) {
+      // Pan mode: store available drag range so crop box follows mouse precisely
+      holder.data("avail_w", imgW - nw);
+      holder.data("avail_h", imgH - nh);
+    } else {
+      // Resize mode: store the anchor corner (diagonally opposite to the dragged corner)
+      const cropX = (imgW - nw) * file.focal_x;
+      const cropY = (imgH - nh) * file.focal_y;
+      const anchorX = corner.includes("l") ? cropX + nw : cropX;
+      const anchorY = corner.includes("t") ? cropY + nh : cropY;
+      holder.data("anchor_x", anchorX);
+      holder.data("anchor_y", anchorY);
+    }
 
     birme.selected_holder = holder;
     $(document).off("mousemove");
@@ -837,25 +901,85 @@ class Birme {
   _image_mousemove(event) {
     let holder = birme.selected_holder;
     let file = holder.data("file");
+    const corner = holder.data("corner");
 
-    const dx = event.clientX - holder.data("x");
-    const dy = event.clientY - holder.data("y");
+    if (!corner) {
+      // Pan mode: move the crop box
+      const dx = event.clientX - holder.data("x");
+      const dy = event.clientY - holder.data("y");
 
-    const fx = holder.data("fx");
-    const fy = holder.data("fy");
+      const fx = holder.data("fx");
+      const fy = holder.data("fy");
 
-    const availW = holder.data("avail_w");
-    const availH = holder.data("avail_h");
+      const availW = holder.data("avail_w");
+      const availH = holder.data("avail_h");
 
-    // When the crop fills the full dimension there is no room to drag, so centre it
-    const new_fx = availW > 0 ? Math.max(0, Math.min(1, fx + dx / availW)) : 0.5;
-    const new_fy = availH > 0 ? Math.max(0, Math.min(1, fy + dy / availH)) : 0.5;
+      // When the crop fills the full dimension there is no room to drag, so centre it
+      const new_fx = availW > 0 ? Math.max(0, Math.min(1, fx + dx / availW)) : 0.5;
+      const new_fy = availH > 0 ? Math.max(0, Math.min(1, fy + dy / availH)) : 0.5;
 
-    file.fx = new_fx;
-    file.fy = new_fy;
-    file.is_custom_focal = true;
+      file.fx = new_fx;
+      file.fy = new_fy;
+      file.is_custom_focal = true;
 
-    if (new_fx !== fx || new_fy !== fy) {
+      if (new_fx !== fx || new_fy !== fy) {
+        birme.preview_one(holder.get(0), file, true);
+      }
+    } else {
+      // Resize mode: change the crop box size while maintaining aspect ratio
+      const imgW = holder.data("img_w");
+      const imgH = holder.data("img_h");
+      const base_nw = holder.data("base_nw");
+      const base_nh = holder.data("base_nh");
+      const anchorX = holder.data("anchor_x");
+      const anchorY = holder.data("anchor_y");
+
+      const holderRect = holder.get(0).getBoundingClientRect();
+      const scaleX = imgW / holderRect.width;
+      const scaleY = imgH / holderRect.height;
+      const mouseX = (event.clientX - holderRect.left) * scaleX;
+      const mouseY = (event.clientY - holderRect.top) * scaleY;
+
+      const tw = config.target_width;
+      const th = config.target_height;
+      const aspect = tw / th;
+
+      // Raw size from anchor to mouse position
+      let rawW = Math.abs(mouseX - anchorX);
+      let rawH = Math.abs(mouseY - anchorY);
+
+      // Maintain target aspect ratio
+      if (rawW / aspect >= rawH) {
+        rawH = rawW / aspect;
+      } else {
+        rawW = rawH * aspect;
+      }
+
+      // Constrain so the crop stays within the image bounds from the anchor
+      const maxFromAnchorW = corner.includes("l") ? anchorX : imgW - anchorX;
+      const maxFromAnchorH = corner.includes("t") ? anchorY : imgH - anchorY;
+      rawW = Math.max(20, Math.min(rawW, maxFromAnchorW, maxFromAnchorH * aspect));
+      rawH = rawW / aspect;
+
+      // Crop box top-left from anchor + corner direction
+      const cropX = corner.includes("l") ? anchorX - rawW : anchorX;
+      const cropY = corner.includes("t") ? anchorY - rawH : anchorY;
+
+      // Derive new crop_scale and focal point
+      const new_crop_scale = Math.max(0.01, Math.min(1.0, rawW / base_nw));
+      const actual_nw = base_nw * new_crop_scale;
+      const actual_nh = base_nh * new_crop_scale;
+      const avail_w = imgW - actual_nw;
+      const avail_h = imgH - actual_nh;
+
+      const new_fx = avail_w > 0 ? Math.max(0, Math.min(1, cropX / avail_w)) : 0.5;
+      const new_fy = avail_h > 0 ? Math.max(0, Math.min(1, cropY / avail_h)) : 0.5;
+
+      file.crop_scale = new_crop_scale;
+      file.fx = new_fx;
+      file.fy = new_fy;
+      file.is_custom_focal = true;
+
       birme.preview_one(holder.get(0), file, true);
     }
   }
