@@ -1,13 +1,13 @@
 <!doctype html>
 <html lang="en-US">
   <head>
-    <title>BIRME - Variant For SD</title>
+    <title>BIRME — SD Variant</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex">
     <meta name="description"
-      content="BIRME is a flexible and easy to use bulk image resizer.
-        It can resize multiple images to any specific dimension and crop images if necessary. It's an online tool and you don't need to download or install on your computer. BIRME is absolutely free to use. It works on both Mac and Windows machines." />
+      content="Bulk image resizer variant optimised for Stable Diffusion training datasets.
+        Resize and crop multiple images to any dimension with hermite, high, medium or low quality presets." />
     <link rel="shortcut icon" type="image/png" href="static/images/favicon.png" />
     <link rel="shortcut icon" href="static/images/favicon.ico">
 
@@ -19,26 +19,39 @@
         theme: {
           extend: {
             colors: {
-              'birme-bg':      '#080810',
-              'birme-surface': '#0e0e1c',
-              'birme-nav':     'rgba(10,10,18,0.92)',
-              'birme-border':  '#1a1a2c',
-              'birme-blue':    '#4595d1',
-              'birme-text':    '#d8d8f0',
-              'birme-muted':   '#60609a',
-            }
+              'bg':       '#080810',
+              'surface':  '#0e0e1c',
+              'surface2': '#0c0c1a',
+              'nav':      'rgba(10,10,18,0.92)',
+              'border':   '#1a1a2c',
+              'border2':  '#2e2e42',
+              'blue':     '#4595d1',
+              'blue2':    '#6ab2e8',
+              'text':     '#d8d8f0',
+              'muted':    '#60609a',
+              'subtle':   '#8080a8',
+              'dim':      '#404060',
+            },
+            fontFamily: {
+              sans: ['"birme-sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+              logo: ['"logo"', 'sans-serif'],
+            },
           }
         }
       }
     </script>
-    <!-- App-specific styles -->
+    <!-- App-specific styles (fonts, icon-font, canvas, scrollbars, state classes) -->
     <link rel="stylesheet" type="text/css" href="css/app.css">
   </head>
 
-  <body class="bg-birme-bg text-birme-text">
+  <body class="bg-bg text-text">
 
-    <!-- ── Navigation ── -->
-    <nav>
+    <!-- ════════════════════════════════════════
+         Navigation
+    ════════════════════════════════════════ -->
+    <nav class="fixed top-0 left-0 right-0 z-50 flex items-center justify-between
+                px-5 h-[68px] bg-nav border-b border-border
+                backdrop-blur-md">
       <a class="logo" href="javascript:void(0)" onclick="birme.show_section('main')">Birme</a>
       <div class="flex items-center gap-1">
         <a class="nav-link" href="javascript:void(0)" onclick="birme.show_section('about')">About</a>
@@ -46,71 +59,72 @@
       </div>
     </nav>
 
-    <!-- ── Main section ── -->
-    <div class="section section-main relative overflow-hidden">
+    <!-- ════════════════════════════════════════
+         Main section
+    ════════════════════════════════════════ -->
+    <div class="section section-main flex relative overflow-hidden" style="height:calc(100vh - 68px)">
 
-      <!-- Left: image tiles + drop zone -->
-      <div class="preview-left">
+      <!-- ── Left: image tiles + drop zone ── -->
+      <div class="preview-left flex flex-col flex-1 min-w-0">
 
-        <!-- Tiles grid (hidden until images added) -->
+        <!-- Tiles grid (hidden until images are added) -->
         <div class="tiles-holder"></div>
 
         <!-- Welcome / drop zone -->
         <div class="welcome">
-          <div class="flex flex-col items-center text-center" style="max-width:460px">
+          <div style="width:100%;max-width:520px;">
 
-            <!-- Glow ring drop icon -->
-            <div class="relative mb-10">
-              <div class="absolute inset-0 rounded-full blur-2xl opacity-20"
-                   style="background:radial-gradient(circle, #4595d1 0%, transparent 70%)"></div>
-              <div class="icon icon-drag relative z-10" style="font-size:88px;color:#1e2040;"></div>
+            <!-- Drop zone card -->
+            <div class="drop-zone-card">
+
+              <!-- Drag icon -->
+              <div style="position:relative;margin-bottom:32px;">
+                <div class="icon icon-drag" style="font-size:80px;color:#1e1e34;line-height:1;"></div>
+              </div>
+
+              <!-- Heading -->
+              <h1 class="gradient-text" style="font-size:1.9rem;font-weight:700;letter-spacing:-0.01em;margin-bottom:8px;">
+                Bulk Image Resizing
+              </h1>
+              <p style="font-size:0.85rem;font-weight:600;letter-spacing:0.08em;color:#8080a8;margin-bottom:6px;">Made Easy — SD Edition</p>
+              <p style="font-size:0.875rem;color:#60609a;line-height:1.6;margin-bottom:28px;max-width:320px;">
+                Resize &amp; crop multiple images for Stable Diffusion training — free, in-browser, no install.
+              </p>
+
+              <!-- Drop hint divider -->
+              <div style="display:flex;align-items:center;gap:12px;width:100%;margin-bottom:14px;">
+                <div style="height:1px;flex:1;background:linear-gradient(to right,transparent,#1e1e34);"></div>
+                <span style="font-size:0.7rem;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#303055;">Drop images here</span>
+                <div style="height:1px;flex:1;background:linear-gradient(to left,transparent,#1e1e34);"></div>
+              </div>
+
+              <p style="font-size:0.75rem;color:#30304a;margin-bottom:18px;">— or —</p>
+
+              <!-- Browse button -->
+              <div class="btn-browse" style="width:220px;">
+                <input type="file" id="file-welcome" class="inputfile" multiple onchange="birme.add_all(event)" />
+                <label>
+                  <svg style="width:16px;height:16px;flex-shrink:0;margin-right:8px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span>Browse Files</span>
+                </label>
+              </div>
             </div>
 
-            <h1 class="text-3xl font-bold tracking-tight mb-3"
-                style="background:linear-gradient(135deg,#c8dcf8,#7ab8e8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">
-              Bulk Image Resizing
-            </h1>
-            <p class="text-sm leading-relaxed mb-1" style="color:#505080;">
-              <span style="color:#9090b8;">Made Easy 2.0</span>
-            </p>
-
-            <p class="text-sm leading-relaxed mb-6 px-4" style="color:#60609a;">
-              Resize and crop multiple images to any dimension — free, online, no install needed.
-            </p>
-
-            <!-- Drop hint -->
-            <div class="flex items-center gap-3 mb-5 w-full justify-center">
-              <div class="h-px flex-1" style="background:linear-gradient(to right,transparent,#1e1e34)"></div>
-              <span class="text-xs font-semibold tracking-widest uppercase" style="color:#303055;">Drop images here</span>
-              <div class="h-px flex-1" style="background:linear-gradient(to left,transparent,#1e1e34)"></div>
-            </div>
-
-            <!-- OR divider -->
-            <div class="text-xs mb-4" style="color:#30304a;">— or —</div>
-
-            <!-- Browse button -->
-            <div class="btn-browse" style="width:220px;">
-              <input type="file" id="file-welcome" class="inputfile" multiple onchange="birme.add_all(event)" />
-              <label>
-                <svg class="mr-2" style="width:16px;height:16px;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <span>Browse Files</span>
-              </label>
-            </div>
-
-            <div class="mt-6 flex flex-col gap-1">
-              <a href="https://birme.net" class="text-xs" style="color:#404068;">(Looking for the real BIRME v2?)</a>
-              <a href="https://v1.birme.net" class="text-xs" style="color:#404068;">(Looking for version 1?)</a>
+            <!-- Footer links -->
+            <div style="margin-top:20px;display:flex;justify-content:center;gap:20px;">
+              <a href="https://birme.net" style="font-size:0.75rem;color:#404060;">(Real BIRME v2)</a>
+              <a href="https://v1.birme.net" style="font-size:0.75rem;color:#404060;">(BIRME v1)</a>
             </div>
           </div>
         </div><!-- /.welcome -->
 
         <!-- "Add more files" browse button (shown when images loaded) -->
-        <div class="btn-browse btn-browse-more">
+        <div class="btn-browse btn-browse-more" style="width:200px;margin:10px auto;">
           <input type="file" id="file-more" class="inputfile" multiple onchange="birme.add_all(event)" />
           <label>
-            <svg class="mr-2" style="width:14px;height:14px;flex-shrink:0;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <svg style="width:14px;height:14px;flex-shrink:0;margin-right:8px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
             </svg>
             <span>Add More Files</span>
@@ -119,13 +133,47 @@
 
       </div><!-- /.preview-left -->
 
-      <!-- ── Right panels ── -->
-      <div class="panels">
+      <!-- ── Right sidebar ── -->
+      <div class="panels w-[340px] shrink-0 flex flex-col gap-2.5
+                  m-3.5 p-3.5 rounded-xl bg-surface border border-border overflow-y-auto">
 
-        <!-- Resize / Crop panel (open by default) -->
-        <div class="panel panel-resize show">
+        <!-- ┌─ SD Presets ─────────────────────────────── -->
+        <div class="rounded-lg overflow-hidden border border-border">
+          <div class="presets-header bg-[#141428] px-3.5 py-2.5 flex items-center gap-2">
+            <svg class="shrink-0 text-blue" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="width:12px;height:12px;color:#4595d1;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+            </svg>
+            <span class="text-xs font-semibold uppercase tracking-widest" style="color:#6090b8;">SD Presets</span>
+          </div>
+          <div class="bg-surface2 p-3" style="background-color:#0c0c1a;padding:12px;">
+            <p class="preset-grid-label">Square</p>
+            <div class="preset-grid">
+              <button type="button" class="preset-btn" onclick="config.apply_preset(512,512)">512²</button>
+              <button type="button" class="preset-btn" onclick="config.apply_preset(640,640)">640²</button>
+              <button type="button" class="preset-btn" onclick="config.apply_preset(768,768)">768²</button>
+              <button type="button" class="preset-btn" onclick="config.apply_preset(896,896)">896²</button>
+              <button type="button" class="preset-btn" onclick="config.apply_preset(1024,1024)">1024²</button>
+              <button type="button" class="preset-btn" onclick="config.apply_preset(1280,1280)">1280²</button>
+            </div>
+            <p class="preset-grid-label">Landscape</p>
+            <div class="preset-grid">
+              <button type="button" class="preset-btn" onclick="config.apply_preset(768,512)">768×512</button>
+              <button type="button" class="preset-btn" onclick="config.apply_preset(1024,768)">1024×768</button>
+              <button type="button" class="preset-btn" onclick="config.apply_preset(1216,832)">1216×832</button>
+            </div>
+            <p class="preset-grid-label">Portrait</p>
+            <div class="preset-grid" style="margin-bottom:0">
+              <button type="button" class="preset-btn" onclick="config.apply_preset(512,768)">512×768</button>
+              <button type="button" class="preset-btn" onclick="config.apply_preset(768,1024)">768×1024</button>
+              <button type="button" class="preset-btn" onclick="config.apply_preset(832,1216)">832×1216</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ┌─ Resize / Crop ──────────────────────────── -->
+        <div class="panel panel-resize show rounded-lg overflow-hidden border border-border">
           <button type="button" onclick="config.toggle_panel(this)" class="btn-toggle">
-            <svg class="inline-block mr-2" style="width:12px;height:12px;vertical-align:-1px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <svg class="inline-block mr-2 w-3 h-3" style="vertical-align:-1px" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
             Resize / Crop
@@ -137,7 +185,7 @@
               <div class="width-height">
                 <label for="target_width">Width</label>
                 <input type="number" id="target_width" min="1" onchange="config.update(this)" />
-                <span class="ml-1 text-xs" style="color:#404060;">px</span>
+                <span class="ml-1 text-xs text-dim">px</span>
               </div>
               <label class="ml-3 flex items-center gap-1 cursor-pointer">
                 <input tabindex="-1" type="checkbox" id="auto_width" onchange="config.update(this)" />
@@ -150,7 +198,7 @@
               <div class="width-height">
                 <label for="target_height">Height</label>
                 <input type="number" id="target_height" min="1" onchange="config.update(this)" />
-                <span class="ml-1 text-xs" style="color:#404060;">px</span>
+                <span class="ml-1 text-xs text-dim">px</span>
               </div>
               <label class="ml-3 flex items-center gap-1 cursor-pointer">
                 <input tabindex="-1" type="checkbox" id="auto_height" onchange="config.update(this)" />
@@ -163,7 +211,7 @@
               <div class="width-height">
                 <label>Ratio</label>
                 <input id="ratio_w" type="number" onchange="config.update_ratio()" />
-                <span class="mx-1" style="color:#404060;">:</span>
+                <span class="mx-1 text-dim">:</span>
                 <input id="ratio_h" type="number" onchange="config.update_ratio()" />
               </div>
             </div>
@@ -178,19 +226,8 @@
 
             <!-- Focal point grid -->
             <div class="crop-align d-none mt-3">
-              <div class="anchor-points mx-auto">
-                <div data-n="0" onclick="config.set_focal(this)"></div>
-                <div data-n="1" onclick="config.set_focal(this)"></div>
-                <div data-n="2" onclick="config.set_focal(this)"></div>
-                <div data-n="3" onclick="config.set_focal(this)"></div>
-                <div data-n="4" onclick="config.set_focal(this)"></div>
-                <div data-n="5" onclick="config.set_focal(this)"></div>
-                <div data-n="6" onclick="config.set_focal(this)"></div>
-                <div data-n="7" onclick="config.set_focal(this)"></div>
-                <div data-n="8" onclick="config.set_focal(this)"></div>
-                <div data-n="9" onclick="config.set_focal(this)"></div>
-              </div>
-              <p class="text-xs text-center mt-2" style="color:#505078;">Set image focal point</p>
+              <div class="anchor-points mx-auto"></div>
+              <p class="text-xs text-center mt-2 text-muted">Set image focal point</p>
             </div>
 
             <label class="no-resize">
@@ -198,12 +235,12 @@
               Do not resize
             </label>
           </div>
-        </div><!-- /panel resize -->
+        </div>
 
-        <!-- Image Format & Quality panel -->
-        <div class="panel">
+        <!-- ┌─ Format & Quality ──────────────────────── -->
+        <div class="panel rounded-lg overflow-hidden border border-border">
           <button type="button" onclick="config.toggle_panel(this)" class="btn-toggle">
-            <svg class="inline-block mr-2" style="width:12px;height:12px;vertical-align:-1px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <svg class="inline-block mr-2 w-3 h-3" style="vertical-align:-1px" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
             </svg>
             Format &amp; Quality
@@ -222,7 +259,7 @@
               </select>
             </div>
 
-            <div class="h-px mb-3" style="background:#1a1a2c;"></div>
+            <div class="h-px mb-3 bg-border"></div>
 
             <!-- Same as original -->
             <label class="flex items-center gap-2 mb-2 cursor-pointer">
@@ -236,9 +273,9 @@
                 <input type="radio" name="image_format" id="image_format_jpeg" value="jpeg" onchange="config.update(this)" />
                 JPEG
               </label>
-              <div class="flex items-center gap-1 text-xs" style="color:#7070a0;">
+              <div class="flex items-center gap-1 text-xs text-muted">
                 Quality
-                <input type="number" min="10" id="quality_jpeg" onchange="config.update(this)" style="width:52px;" />
+                <input type="number" min="10" id="quality_jpeg" onchange="config.update(this)" class="w-[52px]" />
                 <span>%</span>
               </div>
             </div>
@@ -249,44 +286,50 @@
                 <input type="radio" name="image_format" id="image_format_webp" value="webp" onchange="config.update(this)" />
                 WEBP
               </label>
-              <div class="flex items-center gap-1 text-xs" style="color:#7070a0;">
+              <div class="flex items-center gap-1 text-xs text-muted">
                 Quality
-                <input type="number" min="10" id="quality_webp" onchange="config.update(this)" style="width:52px;" />
+                <input type="number" min="10" id="quality_webp" onchange="config.update(this)" class="w-[52px]" />
                 <span>%</span>
               </div>
             </div>
 
             <a href="https://www.birme.net/blog/best-jpeg-quality-for-bulk-image-resizing/" target="_blank" rel="noopener"
-               class="text-xs" style="color:#4070a0;">Need Help? ↗</a>
+               class="text-xs text-blue/70 hover:text-blue transition-colors">Need Help? ↗</a>
           </div>
-        </div><!-- /panel format -->
+        </div>
 
-        <!-- Rename panel -->
-        <div class="panel">
+        <!-- ┌─ Rename ─────────────────────────────────── -->
+        <div class="panel rounded-lg overflow-hidden border border-border">
           <button type="button" onclick="config.toggle_panel(this)" class="btn-toggle">
-            <svg class="inline-block mr-2" style="width:12px;height:12px;vertical-align:-1px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <svg class="inline-block mr-2 w-3 h-3" style="vertical-align:-1px" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
               <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
             Rename
           </button>
           <div class="options-holder">
-            <p class="text-xs mb-1" style="color:#505078;">File name pattern</p>
-            <p class="text-xs mb-2" style="color:#383858;">e.g. <code style="color:#6a8ab8;">image-xxx</code> or <code style="color:#6a8ab8;">ORIGINAL-NAME_512x512</code></p>
-            <input type="text" id="rename" onchange="config.update(this)" class="w-full mb-3" style="width:100%" />
-            <p class="text-xs mb-1" style="color:#505078;">Starting number</p>
-            <input type="number" id="rename_start" onchange="config.update(this)" style="width:100%" />
+            <p class="text-xs mb-1 text-muted">File name pattern</p>
+            <p class="text-xs mb-2 text-dim">
+              e.g. <code class="text-blue/80">image-xxx</code> or
+              <code class="text-blue/80">ORIGINAL-NAME_512x512</code>
+            </p>
+            <input type="text" id="rename" onchange="config.update(this)" class="w-full mb-3" />
+            <p class="text-xs mb-1 text-muted">Starting number</p>
+            <input type="number" id="rename_start" onchange="config.update(this)" class="w-full" />
           </div>
-        </div><!-- /panel rename -->
+        </div>
 
-        <!-- ── Save / action buttons ── -->
-        <div class="save-row">
-          <button type="button" class="btn btn-primary btn-sm" onclick="birme.save_all(true);">
+        <!-- Spacer pushes buttons to bottom when content is short -->
+        <div class="flex-1"></div>
+
+        <!-- ┌─ Save / Action buttons ──────────────────── -->
+        <div class="save-row" style="display:flex;gap:8px;margin-bottom:10px;">
+          <button type="button" class="btn btn-primary btn-sm flex-1" style="flex:1;" onclick="birme.save_all(true);">
             <svg class="inline-block mr-1" style="width:13px;height:13px;vertical-align:-2px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
             ZIP
           </button>
-          <button type="button" class="btn btn-primary btn-sm" onclick="birme.save_all(false);">
+          <button type="button" class="btn btn-primary btn-sm flex-1" style="flex:1;" onclick="birme.save_all(false);">
             <svg class="inline-block mr-1" style="width:13px;height:13px;vertical-align:-2px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
               <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
             </svg>
@@ -294,45 +337,63 @@
           </button>
         </div>
 
-        <div class="action-row">
-          <a class="btn-remove" href="javascript:document.location.reload()">✕ Remove All</a>
-          <a class="btn-reset" href="javascript:config.load(true)">↺ Reset Settings</a>
+        <div class="action-row" style="display:flex;gap:8px;">
+          <a class="btn-remove" style="flex:1;text-align:center;" href="javascript:document.location.reload()">✕ Remove All</a>
+          <a class="btn-reset" style="flex:1;text-align:center;" href="javascript:config.load(true)">↺ Reset Settings</a>
         </div>
 
       </div><!-- /.panels -->
 
     </div><!-- /.section-main -->
 
-    <!-- ── About section ── -->
+    <!-- ════════════════════════════════════════
+         About section
+    ════════════════════════════════════════ -->
     <div class="section section-about">
-      <div class="about-content">
-        <h2>About</h2>
+      <div class="max-w-lg mx-auto px-7 py-12">
 
-        <div class="rounded-xl p-5 mb-5" style="background:#0c0c1c;border:1px solid #1a1a2c;">
-          <p class="text-sm leading-relaxed" style="color:#8080a8;">
-            A focused variant of <a href="https://birme.net" target="_blank" rel="noopener">BIRME</a> built for
-            <strong style="color:#a8a8c8;">Stable Diffusion</strong> users who need to crop and resize training images
-            with precise quality controls.
+        <h2 class="text-xl font-bold uppercase tracking-widest text-center text-text mb-6">About</h2>
+
+        <div class="rounded-xl p-5 mb-4 bg-surface2 border border-border">
+          <p class="text-sm leading-relaxed text-subtle">
+            A focused variant of <a href="https://birme.net" target="_blank" rel="noopener" class="text-blue hover:text-blue2 transition-colors">BIRME</a>
+            built for <strong class="text-text">Stable Diffusion</strong> users who need to crop and resize training
+            images with precise quality controls. Inspired by
+            <a href="https://github.com/livelifebythecode/birme-sd-variant" target="_blank" rel="noopener" class="text-blue hover:text-blue2 transition-colors">livelifebythecode/birme-sd-variant</a>.
           </p>
         </div>
 
-        <div class="rounded-xl p-5 mb-5" style="background:#100a0a;border:1px solid #2a1a1a;">
-          <p class="text-xs font-semibold uppercase tracking-widest mb-2" style="color:#a04040;">⚠ Browser Compatibility</p>
-          <p class="text-sm" style="color:#807070;">
+        <div class="rounded-xl p-5 mb-4 bg-[#100a0a] border border-[#2a1a1a]">
+          <p class="text-xs font-semibold uppercase tracking-widest mb-2 text-[#a04040]">⚠ Browser Compatibility</p>
+          <p class="text-sm text-[#807070]">
             Firefox is not supported due to missing
             <a href="https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/imageSmoothingQuality#browser_compatibility"
-               target="_blank" rel="noopener">imageSmoothingQuality</a> support.
-            Please use Chrome, Edge, or Safari.
+               target="_blank" rel="noopener" class="text-blue hover:text-blue2 transition-colors">imageSmoothingQuality</a>
+            support. Please use Chrome, Edge, or Safari.
           </p>
         </div>
 
-        <p class="text-xs text-center" style="color:#404060;">
-          <a href="https://birme.net" target="_blank" rel="noopener">Support the original BIRME author ↗</a>
+        <div class="rounded-xl p-5 mb-6 bg-surface2 border border-border">
+          <p class="text-xs font-semibold uppercase tracking-widest mb-3 text-subtle">Key Features</p>
+          <ul class="text-sm text-muted space-y-1.5">
+            <li class="flex items-start gap-2"><span class="text-blue mt-0.5">✓</span> SD resolution presets (512², 768², 1024², SDXL and more)</li>
+            <li class="flex items-start gap-2"><span class="text-blue mt-0.5">✓</span> Hermite / High / Medium / Low quality presets</li>
+            <li class="flex items-start gap-2"><span class="text-blue mt-0.5">✓</span> Drag-to-reposition and corner-drag to resize crop</li>
+            <li class="flex items-start gap-2"><span class="text-blue mt-0.5">✓</span> Smart focal-point auto-detection via smartcrop.js</li>
+            <li class="flex items-start gap-2"><span class="text-blue mt-0.5">✓</span> JPEG / WebP / PNG output with custom quality</li>
+            <li class="flex items-start gap-2"><span class="text-blue mt-0.5">✓</span> Bulk rename with pattern support</li>
+          </ul>
+        </div>
+
+        <p class="text-xs text-center text-dim">
+          <a href="https://birme.net" target="_blank" rel="noopener" class="hover:text-muted transition-colors">Support the original BIRME author ↗</a>
         </p>
       </div>
     </div>
 
-    <!-- ── Loading modal ── -->
+    <!-- ════════════════════════════════════════
+         Loading modal
+    ════════════════════════════════════════ -->
     <div class="modal" id="birme-modal">
       <div class="loading">
         <svg xmlns="http://www.w3.org/2000/svg" width="56" height="56" viewBox="0 0 128 128">
@@ -342,7 +403,7 @@
             <animateTransform attributeName="transform" type="rotate" from="0 64 64" to="360 64 64" dur="1400ms" repeatCount="indefinite" />
           </g>
         </svg>
-        <p class="mt-3 text-sm" style="color:#8080a8; letter-spacing:0.1em;">Processing…</p>
+        <p class="mt-3 text-sm text-subtle tracking-widest">Processing…</p>
       </div>
     </div>
 
