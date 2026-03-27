@@ -1,3 +1,21 @@
+/**
+ * Download a Blob directly to the default Downloads folder without
+ * triggering a "Save As" browser dialog.
+ */
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 150);
+}
+
 class BFile {
   constructor(file, n, url) {
     const dot_index = file.name.lastIndexOf(".");
@@ -626,7 +644,7 @@ class Birme {
       } else {
         canvasHermite.toBlob(
           b => {
-            saveAs(b, new_filename);
+            downloadBlob(b, new_filename);
             this.save_one();
           },
           file.output_format.format
@@ -701,7 +719,7 @@ class Birme {
       if (quality > 0) {
         canvas.toBlob(
           b => {
-            saveAs(b, new_filename);
+            downloadBlob(b, new_filename);
             this.save_one();
           },
           output.format,
@@ -710,7 +728,7 @@ class Birme {
       } else {
         canvas.toBlob(
           b => {
-            saveAs(b, new_filename);
+            downloadBlob(b, new_filename);
             this.save_one();
           },
           output.format
