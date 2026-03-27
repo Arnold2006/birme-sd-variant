@@ -61,15 +61,26 @@ class BFile {
         this.fx = result.topCrop.x / this.width;
         this.fy = result.topCrop.y / this.height;
         callback(this.image);
+      })
+      .catch(() => {
+        // If smartcrop fails (e.g. CORS or canvas security error), fall back to centre focal
+        this.fx = 0.5;
+        this.fy = 0.5;
+        callback(this.image);
       });
   }
   read(callback) {
-    loadImage(this.path, image => {
+    loadImage(this.path, (image, data) => {
+      // loadImage calls back with an Event when loading fails
+      if (!image || image instanceof Event) {
+        callback(null);
+        return;
+      }
       this.image = image;
-      this.width = image.width;
-      this.height = image.height;
+      this.width = image.naturalWidth || image.width;
+      this.height = image.naturalHeight || image.height;
       this.auto_focal(callback);
-    });
+    }, { canvas: false });
   }
 
   get path() {
@@ -168,7 +179,7 @@ class BConfig {
       if (!ele.length) {
         continue;
       }
-      switch (ele.attr("type").toLowerCase()) {
+      switch ((ele.attr("type") || "").toLowerCase()) {
         case "checkbox":
         case "radio":
           ele.prop("checked", v);
@@ -395,13 +406,18 @@ class Birme {
   constructor() {
     this.files = [];
     this.files_to_add = [];
-    this.output_zip = false;
-    this.zip = new JSZip();
     this.file_counter = 0;
     this.selected_holder = null;
-    this.masonry = new Masonry(".tiles-holder", {
-      transitionDuration: 0,
-    });
+    try {
+      this.masonry = new Masonry(".tiles-holder", {
+        transitionDuration: 0,
+      });
+    } catch (e) {
+      // Masonry unavailable (e.g. CDN blocked) — use a no-op fallback so
+      // file loading still works; tiles appear as a plain block list instead.
+      // Only appended(), layout() and remove() are called in this codebase.
+      this.masonry = { appended: () => {}, layout: () => {}, remove: () => {} };
+    }
 
     let drop_area = document.querySelector("body");
     drop_area.addEventListener("drop", e => {
@@ -458,7 +474,7 @@ class Birme {
     this.masonry.appended(dom_ele);
     let holder = $(dom_ele.querySelector(".image-holder"));
     f.read(img => {
-      holder.append(img);
+      if (img) holder.append(img);
       this.add_one();
     });
     holder.data("file", f);
