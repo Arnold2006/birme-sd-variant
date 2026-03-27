@@ -413,8 +413,6 @@ class Birme {
     this.zip = new JSZip();
     this.file_counter = 0;
     this.selected_holder = null;
-    this.mask_pattern = new Image();
-    this.mask_pattern.src = "static/images/stripes-light.png";
     this.masonry = new Masonry(".tiles-holder", {
       transitionDuration: 0,
     });
@@ -530,18 +528,43 @@ class Birme {
       nh = th * Math.min(w / tw, h / th);
     }
 
+    // Store crop dimensions on the image-holder for use in drag calculations
+    const imageHolder = holder.classList.contains("image-holder") ? holder : holder.querySelector(".image-holder");
+    $(imageHolder).data("nw", nw);
+    $(imageHolder).data("nh", nh);
+
     mask.width = w;
     mask.height = h;
 
     const ctx = mask.getContext("2d");
-    ctx.fillStyle = ctx.createPattern(this.mask_pattern, "repeat");
+
+    // Draw semi-transparent dark overlay over the entire image
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
     ctx.fillRect(0, 0, w, h);
-    ctx.clearRect((w - nw) * fx, (h - nh) * fy, nw, nh);
+
+    // Clear the crop selection area so the underlying image shows through
+    const cropX = Math.round((w - nw) * fx);
+    const cropY = Math.round((h - nh) * fy);
+    ctx.clearRect(cropX, cropY, nw, nh);
+
+    // Draw a visible border around the crop selection
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(cropX, cropY, nw, nh);
+
+    // Draw corner handles to indicate the selection is draggable
+    const handleSize = 8;
+    ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+    ctx.fillRect(cropX, cropY, handleSize, handleSize);
+    ctx.fillRect(cropX + nw - handleSize, cropY, handleSize, handleSize);
+    ctx.fillRect(cropX, cropY + nh - handleSize, handleSize, handleSize);
+    ctx.fillRect(cropX + nw - handleSize, cropY + nh - handleSize, handleSize, handleSize);
+
     if (config.border_width > 0) {
       let border_width = Math.max(2, Math.round((config.border_width * w) / tw));
       ctx.strokeStyle = config.border_color;
       ctx.lineWidth = border_width;
-      ctx.strokeRect((w - nw) * fx + border_width / 2, (h - nh) * fy + border_width / 2, nw - border_width, nh - border_width);
+      ctx.strokeRect(cropX + border_width / 2, cropY + border_width / 2, nw - border_width, nh - border_width);
     }
   }
 
@@ -799,6 +822,13 @@ class Birme {
 
     holder.data("fx", file.focal_x);
     holder.data("fy", file.focal_y);
+
+    // Store available drag range so crop box follows mouse precisely
+    const nw = holder.data("nw") || holder.width();
+    const nh = holder.data("nh") || holder.height();
+    holder.data("avail_w", holder.width() - nw);
+    holder.data("avail_h", holder.height() - nh);
+
     birme.selected_holder = holder;
     $(document).off("mousemove");
     $(document).on("mousemove", birme._image_mousemove);
@@ -808,25 +838,24 @@ class Birme {
     let holder = birme.selected_holder;
     let file = holder.data("file");
 
-    let x = event.clientX;
-    let y = event.clientY;
-    let ox = holder.data("x");
-    let oy = holder.data("y");
+    const dx = event.clientX - holder.data("x");
+    const dy = event.clientY - holder.data("y");
 
-    let fx = holder.data("fx");
-    let fy = holder.data("fy");
+    const fx = holder.data("fx");
+    const fy = holder.data("fy");
 
-    let new_fx = fx + ((x - ox) / holder.width()) * 2;
-    let new_fy = fy + ((y - oy) / holder.height()) * 2;
+    const availW = holder.data("avail_w");
+    const availH = holder.data("avail_h");
 
-    new_fx = Math.max(0, Math.min(1, new_fx));
-    new_fy = Math.max(0, Math.min(1, new_fy));
+    // When the crop fills the full dimension there is no room to drag, so centre it
+    const new_fx = availW > 0 ? Math.max(0, Math.min(1, fx + dx / availW)) : 0.5;
+    const new_fy = availH > 0 ? Math.max(0, Math.min(1, fy + dy / availH)) : 0.5;
 
     file.fx = new_fx;
     file.fy = new_fy;
     file.is_custom_focal = true;
 
-    if (new_fx != fx || new_fy != fy) {
+    if (new_fx !== fx || new_fy !== fy) {
       birme.preview_one(holder.get(0), file, true);
     }
   }
