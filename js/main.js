@@ -103,13 +103,6 @@ const default_parameters = {
   quality_webp: 50,
   rename: "",
   rename_start: 0,
-  border_width: 0,
-  border_color: "#000",
-  wm_text: "",
-  wm_font: "sans-serif",
-  wm_size: 18,
-  wm_position: "bottom-right",
-  wm_margin: 20,
   quality_preset: "high"
 };
 
@@ -175,7 +168,6 @@ class BConfig {
     this.calculate_ratio();
     this.toggle_no_resize();
     this.toggle_auto_focal();
-    this.update_watermark_preview();
 
     if (reset) {
       birme.preview_visible(true);
@@ -212,10 +204,6 @@ class BConfig {
         this.last_edit = "height";
       }
       this.calculate_ratio();
-    }
-
-    if (name.indexOf("wm_") == 0) {
-      this.update_watermark_preview();
     }
 
     this.toggle_auto_focal();
@@ -364,45 +352,6 @@ class BConfig {
     }
     $("#ratio_w").val(w);
     $("#ratio_h").val(h);
-  }
-
-  map_font(f) {
-    return { cursive: "Meddon", serif: "Times New Roman", "sans-serif": "Helvetica, Arial" }[f];
-  }
-  update_watermark_preview() {
-    document.querySelector(".wm-preview .text").style.fontFamily = this.map_font(this.wm_font);
-    document.querySelector(".wm-preview .text").style.fontSize = this.wm_size + "px";
-    if (this.wm_text) {
-      localStorage.removeItem("wm_image");
-      document.querySelector(".wm-preview .text").innerHTML = this.wm_text ? this.wm_text : "&copy;2022 All Rights Reserved";
-      document.querySelector(".wm-preview .image").innerHTML = "";
-    } else {
-      document.querySelector(".wm-preview .text").innerHTML = "";
-      let image = localStorage.getItem("wm_image");
-      if (image) {
-        document.querySelector(".wm-preview .image").innerHTML = `<img src="${image}">`;
-        this.wm_image = document.querySelector(".wm-preview .image img");
-        setTimeout(() => {
-          this.wm_image_height = document.querySelector(".wm-preview .image").offsetHeight;
-          this.wm_image_width = document.querySelector(".wm-preview .image").offsetWidth;
-        }, 100);
-      }
-    }
-  }
-  upload_wm(e) {
-    let _files = e["dataTransfer"] ? e.dataTransfer.files : e.target.files;
-    loadImage(_files[0], image => {
-      let canv = document.createElement("canvas");
-      let con = canv.getContext("2d");
-      canv.width = image.width;
-      canv.height = image.height;
-      con.drawImage(image, 0, 0);
-      localStorage.setItem("wm_image", canv.toDataURL());
-      this.wm_text = "";
-      document.querySelector("#wm_text").value = "";
-      this.update_watermark_preview();
-    });
-    e.currentTarget.value = "";
   }
 }
 
@@ -569,13 +518,6 @@ class Birme {
     ctx.fillRect(cropX + nw - handleSize, cropY, handleSize, handleSize);
     ctx.fillRect(cropX, cropY + nh - handleSize, handleSize, handleSize);
     ctx.fillRect(cropX + nw - handleSize, cropY + nh - handleSize, handleSize, handleSize);
-
-    if (config.border_width > 0) {
-      let border_width = Math.max(2, Math.round((config.border_width * w) / tw));
-      ctx.strokeStyle = config.border_color;
-      ctx.lineWidth = border_width;
-      ctx.strokeRect(cropX + border_width / 2, cropY + border_width / 2, nw - border_width, nh - border_width);
-    }
   }
 
   save_all(output_zip) {
@@ -708,33 +650,8 @@ class Birme {
       con.fillStyle = "white";
       con.fillRect(0, 0, tw, th);
     }
-    /*******************************************
-     * Border
-     ******************************************/
-    let hw = 0;
-    if (config.border_width > 0) {
-      con.lineWidth = config.border_width;
-      con.strokeStyle = config.border_color;
-      hw = config.border_width / 2;
-      con.strokeRect(hw, hw, tw - hw * 2, th - hw * 2);
-    }
-    /*******************************************
-     * Image after the border
-     ******************************************/
     con.drawImage(img, (iw - srcw) * fx, (ih - srch) * fy, srcw, srch,
-                       hw, hw, tw - hw * 2, th - hw * 2);
-    if (config.wm_text) {  // ENGAGE WATERMARKING TEXT
-      con.font = config.wm_size + "px " + config.map_font(config.wm_font);
-      con.textBaseline = "top";
-      con.textAlign = "right";
-      con.fillStyle = "rgba(255,255,255,0.8)";
-      con.shadowOffsetY = 2;
-      con.shadowBlur = 5;
-      con.shadowColor = "rgba(0,0,0,0.8)";
-      con.fillText(config.wm_text, tw - 10, th - config.wm_size - 10);
-    } else if (config.wm_image) {  // ENGAGE WATERMARKING IMAGE
-      con.drawImage(config.wm_image, tw - config.wm_image_width - 10, th - 10 - config.wm_image_height);
-    }
+                       0, 0, tw, th);
     let new_filename;
     if (config.rename) {
       if (config.rename.indexOf('ORIGINAL-NAME') > -1) {
@@ -817,7 +734,6 @@ class Birme {
   }
   hide_modal() {
     $(".modal").removeClass("show-loading");
-    $(".modal").removeClass("show-wm");
   }
 
   _detect_corner(holder, clientX, clientY) {
@@ -1013,5 +929,5 @@ if (document.location.href.indexOf("8080") > -1) {
   }
   // birme._add_test_image("2", "png");
   $("body").addClass("not-empty");
-  // birme.show_modal("wm");
+  // birme.show_modal("loading");
 }
