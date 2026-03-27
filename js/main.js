@@ -310,6 +310,22 @@ class BConfig {
     this.update_url();
   }
 
+  apply_preset(width, height) {
+    this.target_width  = width;
+    this.target_height = height;
+    this.auto_width    = false;
+    this.auto_height   = false;
+    $("#target_width").val(width).removeAttr("disabled");
+    $("#target_height").val(height).removeAttr("disabled");
+    $("#auto_width").prop("checked", false);
+    $("#auto_height").prop("checked", false);
+    $("body").removeClass("auto-size");
+    this.calculate_ratio();
+    this.toggle_auto_focal();
+    birme.preview_visible(true);
+    this.update_url();
+  }
+
   toggle_panel(ele) {
     $(".panel.show .options-holder").slideUp(300);
     $(".panel.show").removeClass("show");
@@ -940,6 +956,22 @@ class Birme {
 
 let birme = new Birme();
 let config = new BConfig();
+
+// Build the anchor-points focal grid dynamically
+(function buildAnchorPoints() {
+  const container = document.querySelector(".anchor-points");
+  if (!container) return;
+  // 9 clickable positions + 1 indicator div (last child)
+  for (let n = 0; n < 10; n++) {
+    const div = document.createElement("div");
+    if (n < 9) {
+      div.setAttribute("data-n", n);
+      div.addEventListener("click", () => config.set_focal(div));
+    }
+    container.appendChild(div);
+  }
+  config.update_focal();
+})();
 
 // Testing code
 if (document.location.href.indexOf("8080") > -1) {
