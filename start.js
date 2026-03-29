@@ -1,23 +1,23 @@
 module.exports = {
+  daemon: true,
   run: [
-    // Start the Flask server; advance to the next step once it reports "Running on"
     {
       method: "shell.run",
       params: {
-        id: "server",
-        venv: "venv",
-        message: "python server.py",
+        venv: "env",
+        message: [
+          "python server.py",
+        ],
         on: [{
-          event: "/Running on/",
-          done: true
+          "event": "/http:\\/\\/\\S+/",
+          "done": true
         }]
       }
     },
-    // Open the app in the Pinokio browser
     {
-      method: "browser.open",
+      method: "local.set",
       params: {
-        uri: "http://localhost:7861"
+        url: "{{input.event[0]}}"
       }
     }
   ]
