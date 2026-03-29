@@ -42,7 +42,7 @@ CAPTION_PROMPTS = {
 
 
 def _load_model():
-    """Load the JoyCaption model on CUDA (4-bit NF4 → fp16 fallback) or CPU."""
+    """Load the JoyCaption model on CUDA (4-bit NF4 → bfloat16 fallback) or CPU."""
     global _model, _processor, _model_status, _compute_dtype, _device
     _model_status = "loading"
     try:
@@ -57,7 +57,7 @@ def _load_model():
         if torch.cuda.is_available():
             _device = torch.device("cuda")
             # Prefer 4-bit NF4 quantisation (requires bitsandbytes).
-            # Fall back to fp16 when bitsandbytes is not installed.
+            # Fall back to bfloat16 when bitsandbytes is not installed.
             try:
                 from transformers import BitsAndBytesConfig
 
@@ -67,19 +67,23 @@ def _load_model():
                     bnb_4bit_quant_type="nf4",
                     bnb_4bit_compute_dtype=_compute_dtype,
                     bnb_4bit_use_double_quant=True,
+                    # Skip vision components to avoid dtype mismatch with LLaVA
+                    llm_int8_skip_modules=["vision_tower", "multi_modal_projector"],
                 )
                 _model = LlavaForConditionalGeneration.from_pretrained(
                     MODEL_ID,
                     quantization_config=quantization_config,
-                    device_map="cuda",
+                    torch_dtype=torch.bfloat16,
+                    device_map="auto",
                 )
             except (ImportError, ModuleNotFoundError):
-                # bitsandbytes unavailable – load in fp16 directly on CUDA
-                _compute_dtype = torch.float16
+                # bitsandbytes unavailable – load in bfloat16 directly on CUDA
+                _compute_dtype = torch.bfloat16
                 _model = LlavaForConditionalGeneration.from_pretrained(
                     MODEL_ID,
-                    torch_dtype=torch.float16,
-                ).to(_device)
+                    torch_dtype=torch.bfloat16,
+                    device_map="auto",
+                )
         else:
             _device = torch.device("cpu")
             _compute_dtype = torch.float32
