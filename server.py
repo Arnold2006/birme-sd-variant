@@ -28,7 +28,7 @@ _processor = None
 _model_lock = threading.Lock()
 _model_status = "not_loaded"  # not_loaded | loading | ready | error:<msg>
 
-MODEL_ID = "fancyfeast/joy-caption-alpha-two"
+MODEL_ID = "fancyfeast/llama-joycaption-alpha-two-hf-llava"
 
 CAPTION_PROMPTS = {
     "descriptive": "Write a descriptive caption for this image in a formal tone.",
@@ -159,7 +159,7 @@ def api_caption():
 
         return jsonify({"caption": caption})
 
-    except (ValueError, IOError, RuntimeError, KeyError, TypeError) as exc:
+    except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
 
