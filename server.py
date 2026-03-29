@@ -209,11 +209,17 @@ def api_caption():
         import torch
 
         # Build the conversation using plain-text user content (no {"type":"image"}
-        # entry).  This mirrors the proven working Jay_Caption approach and avoids
-        # the duplicate <bos>-token issue that degrades model output when the
-        # multimodal content-list format is combined with apply_chat_template.
-        # The image is passed separately to processor(text=..., images=...) so
-        # the LlavaProcessor inserts image tokens at the correct position.
+        # list entry) to avoid the duplicate <bos>-token issue that the structured
+        # multimodal content-list format introduces when combined with
+        # apply_chat_template.
+        #
+        # The "<image>" placeholder is embedded literally in the user message so
+        # that the LLaVA tokenizer converts it to the special image-token ID in
+        # input_ids.  LlavaForConditionalGeneration._merge_input_ids_with_image_features
+        # requires exactly one image token in input_ids for each image passed via
+        # pixel_values; without it the forward pass raises a ValueError and the
+        # request returns 500.  The pixel_values are still produced separately by
+        # the image processor inside the processor() call below.
         conversation = [
             {
                 "role": "system",
@@ -221,7 +227,7 @@ def api_caption():
             },
             {
                 "role": "user",
-                "content": prompt_text,
+                "content": f"<image>\n{prompt_text}",
             },
         ]
         convo_string = processor.apply_chat_template(
