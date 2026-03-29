@@ -3,7 +3,7 @@
 Flask server for Birme SD Variant.
 
 Serves the static web app and exposes a /api/caption endpoint that runs
-images through the JoyCaption Alpha Two model (fancyfeast/joy-caption-alpha-two).
+images through the JoyCaption Beta One model (fancyfeast/llama-joycaption-beta-one-hf-llava).
 """
 
 import base64
@@ -32,12 +32,11 @@ _compute_dtype = None  # dtype used for pixel_values (set during model load)
 MODEL_ID = "fancyfeast/llama-joycaption-beta-one-hf-llava"
 
 CAPTION_PROMPTS = {
-    "descriptive": "Write a descriptive caption for this image in a formal tone.",
+    "descriptive": "Write a long detailed description for this image.",
     "training": (
-        "Write a stable diffusion training caption for this image. "
-        "Focus on visual details such as subject, style, colours, lighting and composition."
+        "Output a stable diffusion prompt that is indistinguishable from a real stable diffusion prompt."
     ),
-    "short": "Write a short, concise caption for this image in one sentence.",
+    "short": "Write a short description for this image.",
 }
 
 
@@ -56,7 +55,7 @@ def _load_model():
         _processor = AutoProcessor.from_pretrained(MODEL_ID)
 
         if torch.cuda.is_available():
-            _compute_dtype = torch.float16
+            _compute_dtype = torch.bfloat16
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_quant_type="nf4",
@@ -125,7 +124,7 @@ def api_preload():
 @app.route("/api/caption", methods=["POST"])
 def api_caption():
     """
-    Caption a single image with JoyCaption Alpha Two.
+    Caption a single image with JoyCaption Beta One.
 
     Request JSON:
         {
@@ -157,41 +156,55 @@ def api_caption():
 
         import torch
 
+        # Build the conversation: system message + plain text user prompt.
+        # WARNING: HF's handling of chats on LLaVA models is fragile.
+        # Do NOT put {"type": "image"} in the conversation content – pass the
+        # image directly to processor() instead to avoid double image tokens.
         conversation = [
             {
+                "role": "system",
+                "content": "You are a helpful image captioner.",
+            },
+            {
                 "role": "user",
-                "content": [
-                    {"type": "image"},
-                    {"type": "text", "text": prompt_text},
-                ],
-            }
+                "content": prompt_text,
+            },
         ]
-        # tokenize=False returns a plain string; without it the default is
-        # tokenize=True which returns token IDs and breaks processor() below.
-        prompt = processor.apply_chat_template(
-            conversation, add_generation_prompt=True, tokenize=False
+        convo_string = processor.apply_chat_template(
+            conversation, tokenize=False, add_generation_prompt=True
         )
+        assert isinstance(convo_string, str)
 
         # model.device is 'meta' when device_map="auto" is used; derive the
         # real device from the first parameter instead.
         device = next(model.parameters()).device
-        inputs = processor(images=image, text=prompt, return_tensors="pt").to(device)
+        # Pass text as a list and image separately – the processor inserts the
+        # image tokens automatically.
+        inputs = processor(
+            text=[convo_string], images=[image], return_tensors="pt"
+        ).to(device)
 
-        # Cast pixel_values to the model's compute dtype on CUDA to avoid
-        # dtype mismatches with 4-bit quantised weights.
-        if device.type == "cuda":
-            inputs["pixel_values"] = inputs["pixel_values"].to(_compute_dtype)
+        # Cast pixel_values to the model's compute dtype (bfloat16 on CUDA,
+        # float32 on CPU) to match the quantised weights.
+        inputs["pixel_values"] = inputs["pixel_values"].to(_compute_dtype)
 
         with torch.no_grad():
             output_ids = model.generate(
                 **inputs,
                 max_new_tokens=512,
-                do_sample=False,
+                do_sample=True,
+                suppress_tokens=None,
+                use_cache=True,
+                temperature=0.6,
+                top_p=0.9,
             )
 
-        caption = processor.decode(
-            output_ids[0][inputs["input_ids"].shape[-1]:],
+        # Trim the prompt tokens from the front of the output.
+        generate_ids = output_ids[0][inputs["input_ids"].shape[-1]:]
+        caption = processor.tokenizer.decode(
+            generate_ids,
             skip_special_tokens=True,
+            clean_up_tokenization_spaces=False,
         ).strip()
 
         return jsonify({"caption": caption})
