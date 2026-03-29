@@ -1139,6 +1139,7 @@ class Birme {
           f.caption_status = "error";
           failed++;
           console.error("Caption error for", f.base_name, ":", err);
+        }
         this._update_tile_caption(f);
       }
 
