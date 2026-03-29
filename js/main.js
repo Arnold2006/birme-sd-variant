@@ -938,8 +938,8 @@ class Birme {
       const mouseX = (event.clientX - holderRect.left) * scaleX;
       const mouseY = (event.clientY - holderRect.top) * scaleY;
 
-      const tw = config.target_width;
-      const th = config.target_height;
+      const tw = file.flipped ? config.target_height : config.target_width;
+      const th = file.flipped ? config.target_width : config.target_height;
       const aspect = tw / th;
 
       // Raw size from anchor to mouse position
