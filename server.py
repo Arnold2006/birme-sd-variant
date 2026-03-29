@@ -151,6 +151,7 @@ def api_caption():
 
         caption_type = data.get("caption_type", "descriptive")
         prompt_text = CAPTION_PROMPTS.get(caption_type, CAPTION_PROMPTS["descriptive"])
+        system_prompt = data.get("system_prompt", "").strip() or "You are a helpful image captioner."
 
         model, processor = _get_model()
 
@@ -163,7 +164,7 @@ def api_caption():
         conversation = [
             {
                 "role": "system",
-                "content": "You are a helpful image captioner.",
+                "content": system_prompt,
             },
             {
                 "role": "user",

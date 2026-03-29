@@ -161,11 +161,8 @@
               <button type="button" class="preset-btn" onclick="config.apply_preset(1024,768)">1024×768</button>
               <button type="button" class="preset-btn" onclick="config.apply_preset(1216,832)">1216×832</button>
             </div>
-            <p class="preset-grid-label">Portrait</p>
-            <div class="preset-grid" style="margin-bottom:0">
-              <button type="button" class="preset-btn" onclick="config.apply_preset(512,768)">512×768</button>
-              <button type="button" class="preset-btn" onclick="config.apply_preset(768,1024)">768×1024</button>
-              <button type="button" class="preset-btn" onclick="config.apply_preset(832,1216)">832×1216</button>
+            <div style="margin-top:8px;margin-bottom:0;">
+              <button type="button" class="preset-btn" style="width:100%;" onclick="config.flip_preset()">↕ Flip to Portrait</button>
             </div>
           </div>
         </div>
@@ -327,6 +324,15 @@
             JoyCaption
           </button>
           <div class="options-holder">
+            <!-- System prompt -->
+            <div class="mb-3">
+              <label for="joycaption_system_prompt" class="text-xs text-muted block mb-1">System prompt</label>
+              <textarea id="joycaption_system_prompt" rows="3"
+                        class="w-full text-xs"
+                        placeholder="You are a helpful image captioner."
+                        style="resize:vertical;"></textarea>
+            </div>
+
             <!-- Caption type -->
             <div class="flex items-center justify-between mb-3">
               <label for="joycaption_type" class="shrink-0 mr-2 text-xs text-muted">Caption type</label>
@@ -362,22 +368,6 @@
 
         <!-- Spacer pushes buttons to bottom when content is short -->
         <div class="flex-1"></div>
-
-        <!-- ┌─ Save / Action buttons ──────────────────── -->
-        <div class="save-row" style="display:flex;gap:8px;margin-bottom:10px;">
-          <button type="button" class="btn btn-primary btn-sm flex-1" style="flex:1;" onclick="birme.save_all(true);">
-            <svg class="inline-block mr-1" style="width:13px;height:13px;vertical-align:-2px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            ZIP
-          </button>
-          <button type="button" class="btn btn-primary btn-sm flex-1" style="flex:1;" onclick="birme.save_all(false);">
-            <svg class="inline-block mr-1" style="width:13px;height:13px;vertical-align:-2px;" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-            </svg>
-            Save Files
-          </button>
-        </div>
 
         <div class="action-row" style="display:flex;gap:8px;">
           <a class="btn-remove" style="flex:1;text-align:center;" href="javascript:document.location.reload()">✕ Remove All</a>
