@@ -18,6 +18,7 @@ import base64
 import io
 import os
 import threading
+import traceback
 
 from flask import Flask, jsonify, request, send_from_directory
 from PIL import Image
@@ -244,6 +245,12 @@ def api_caption():
         inputs["pixel_values"] = inputs["pixel_values"].to(_compute_dtype)
 
         with torch.no_grad():
+            # In transformers 4.48+ (LLaMA 3.1 tokenizers), eos_token_id can be
+            # a list of multiple end-of-sequence IDs.  generate() requires
+            # pad_token_id to be a plain integer, so we extract the first element
+            # if a list is returned.
+            _eos = processor.tokenizer.eos_token_id
+            _pad_id = _eos[0] if isinstance(_eos, list) else _eos
             output_ids = model.generate(
                 **inputs,
                 max_new_tokens=512,
@@ -253,7 +260,7 @@ def api_caption():
                 temperature=temperature if temperature > 0 else None,
                 top_k=None,
                 top_p=top_p if temperature > 0 else None,
-                pad_token_id=processor.tokenizer.eos_token_id,
+                pad_token_id=_pad_id,
             )
 
         # Trim the prompt tokens from the front of the output.
@@ -267,6 +274,7 @@ def api_caption():
         return jsonify({"caption": caption})
 
     except Exception as exc:
+        traceback.print_exc()
         return jsonify({"error": str(exc)}), 500
 
 
