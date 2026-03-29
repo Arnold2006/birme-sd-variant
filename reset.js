@@ -1,8 +1,8 @@
 module.exports = {
   run: [{
-    method: "shell.run",
+    method: "fs.rm",
     params: {
-      message: "git pull"
+      path: "env"
     }
   }]
 }
