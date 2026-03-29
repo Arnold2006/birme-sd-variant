@@ -54,7 +54,8 @@ a { text-decoration: none; }
    ══════════════════════════════════════════════ */
 select,
 input[type="number"],
-input[type="text"] {
+input[type="text"],
+textarea {
   background-color: #12121e;
   color: #d8d8f0;
   border: 1px solid #2e2e42;
@@ -65,7 +66,8 @@ input[type="text"] {
 }
 select:focus,
 input[type="number"]:focus,
-input[type="text"]:focus { border-color: #4595d1; outline: none; }
+input[type="text"]:focus,
+textarea:focus { border-color: #4595d1; outline: none; }
 input[type="radio"],
 input[type="checkbox"] { accent-color: #4595d1; }
 
@@ -214,6 +216,22 @@ nav .nav-link:hover { color: #9898c8; }
   transition: background-color 0.2s;
 }
 .section-main .image-holder .btn-delete:hover { background-color: rgba(100,170,220,0.95); }
+.section-main .image-holder .btn-flip {
+  position: absolute;
+  right: 6px;
+  top: 34px;
+  color: #e8e8f8;
+  background-color: rgba(69,149,209,0.8);
+  padding: 2px 8px;
+  cursor: pointer;
+  z-index: 2;
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+  font-size: 0.82rem;
+  transition: background-color 0.2s;
+}
+.section-main .image-holder .btn-flip:hover { background-color: rgba(100,170,220,0.95); }
+.section-main .image-holder .btn-flip.flipped { background-color: rgba(69,149,209,1.0); }
 .section-main .image-holder img     { width: 100%; height: auto; pointer-events: none; display: block; }
 .section-main .image-holder .image-mask { opacity: 0.8; transition: opacity 0.2s; }
 .section-main .image-holder:hover .image-mask { opacity: 0.45; }
