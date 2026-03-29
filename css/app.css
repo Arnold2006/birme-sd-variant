@@ -496,3 +496,21 @@ body.auto-size .ratio              { display: none; }
 .no-resize input           { margin-right: 6px; }
 .ratio                     { display: flex; align-items: center; }
 label                      { font-size: 0.83rem; color: #8080a8; }
+
+/* ══════════════════════════════════════════════
+   JoyCaption tile badge
+   ══════════════════════════════════════════════ */
+.caption-badge {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  background: rgba(10,10,24,0.82);
+  border: 1px solid #2e2e42;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  padding: 1px 4px;
+  color: #4595d1;
+  pointer-events: none;
+  line-height: 1.4;
+  z-index: 10;
+}

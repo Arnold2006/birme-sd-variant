@@ -1,1 +1,4 @@
 comparison-images/src
+venv/
+__pycache__/
+*.pyc
