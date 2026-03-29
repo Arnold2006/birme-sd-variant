@@ -99,8 +99,6 @@ def _load_model():
                     bnb_4bit_quant_type="nf4",
                     bnb_4bit_compute_dtype=_compute_dtype,
                     bnb_4bit_use_double_quant=True,
-                    # Skip vision components to avoid dtype mismatch with LLaVA
-                    llm_int8_skip_modules=["vision_tower", "multi_modal_projector"],
                 )
                 _model = LlavaForConditionalGeneration.from_pretrained(
                     MODEL_ID,
@@ -240,9 +238,14 @@ def api_caption():
             text=[convo_string], images=[image], return_tensors="pt"
         ).to(_device)
 
-        # Cast pixel_values to the model's compute dtype (bfloat16 on CUDA,
-        # float32 on CPU) to match the quantised weights.
-        inputs["pixel_values"] = inputs["pixel_values"].to(_compute_dtype)
+        # Cast all floating-point tensors to the model's compute dtype
+        # (bfloat16 on CUDA, float32 on CPU) to avoid dtype mismatches.
+        # Casting every float tensor (not just pixel_values) is important
+        # because some processor versions may return additional float tensors.
+        inputs = {
+            k: v.to(_compute_dtype) if isinstance(v, torch.Tensor) and v.is_floating_point() else v
+            for k, v in inputs.items()
+        }
 
         with torch.no_grad():
             # In transformers 4.48+ (LLaMA 3.1 tokenizers), eos_token_id can be
