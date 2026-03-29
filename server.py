@@ -28,6 +28,7 @@ _processor = None
 _model_lock = threading.Lock()
 _model_status = "not_loaded"  # not_loaded | loading | ready | error:<msg>
 _compute_dtype = None  # dtype used for pixel_values (set during model load)
+_device = None  # torch.device used for inference (set during model load)
 
 MODEL_ID = "fancyfeast/llama-joycaption-beta-one-hf-llava"
 
@@ -41,39 +42,51 @@ CAPTION_PROMPTS = {
 
 
 def _load_model():
-    """Load the JoyCaption model in NF4 4-bit quantisation (called inside _model_lock)."""
-    global _model, _processor, _model_status, _compute_dtype
+    """Load the JoyCaption model on CUDA (4-bit NF4 → fp16 fallback) or CPU."""
+    global _model, _processor, _model_status, _compute_dtype, _device
     _model_status = "loading"
     try:
         import torch
         from transformers import (
             AutoProcessor,
-            BitsAndBytesConfig,
             LlavaForConditionalGeneration,
         )
 
         _processor = AutoProcessor.from_pretrained(MODEL_ID)
 
         if torch.cuda.is_available():
-            _compute_dtype = torch.bfloat16
-            quantization_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=_compute_dtype,
-                bnb_4bit_use_double_quant=True,
-            )
-            _model = LlavaForConditionalGeneration.from_pretrained(
-                MODEL_ID,
-                quantization_config=quantization_config,
-                device_map="auto",
-            )
+            _device = torch.device("cuda")
+            # Prefer 4-bit NF4 quantisation (requires bitsandbytes).
+            # Fall back to fp16 when bitsandbytes is not installed.
+            try:
+                from transformers import BitsAndBytesConfig
+
+                _compute_dtype = torch.bfloat16
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_compute_dtype=_compute_dtype,
+                    bnb_4bit_use_double_quant=True,
+                )
+                _model = LlavaForConditionalGeneration.from_pretrained(
+                    MODEL_ID,
+                    quantization_config=quantization_config,
+                    device_map="cuda",
+                )
+            except (ImportError, ModuleNotFoundError):
+                # bitsandbytes unavailable – load in fp16 directly on CUDA
+                _compute_dtype = torch.float16
+                _model = LlavaForConditionalGeneration.from_pretrained(
+                    MODEL_ID,
+                    torch_dtype=torch.float16,
+                ).to(_device)
         else:
-            # NF4 requires CUDA; fall back to float32 on CPU
+            _device = torch.device("cpu")
             _compute_dtype = torch.float32
             _model = LlavaForConditionalGeneration.from_pretrained(
                 MODEL_ID,
                 torch_dtype=torch.float32,
-            ).to("cpu")
+            ).to(_device)
 
         _model.eval()
         _model_status = "ready"
@@ -176,14 +189,11 @@ def api_caption():
         )
         assert isinstance(convo_string, str)
 
-        # model.device is 'meta' when device_map="auto" is used; derive the
-        # real device from the first parameter instead.
-        device = next(model.parameters()).device
         # Pass text as a list and image separately – the processor inserts the
         # image tokens automatically.
         inputs = processor(
             text=[convo_string], images=[image], return_tensors="pt"
-        ).to(device)
+        ).to(_device)
 
         # Cast pixel_values to the model's compute dtype (bfloat16 on CUDA,
         # float32 on CPU) to match the quantised weights.
