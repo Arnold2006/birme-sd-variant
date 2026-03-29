@@ -52,12 +52,19 @@ def _load_model():
             LlavaForConditionalGeneration,
         )
 
-        _processor = AutoProcessor.from_pretrained(MODEL_ID)
+        # use_fast=False forces the PIL image-processor backend so that the
+        # model's default LANCZOS resample is honoured exactly.  The torchvision
+        # backend (selected automatically when torchvision is installed) does not
+        # support LANCZOS and silently downgrades to BICUBIC, which changes
+        # output quality.
+        _processor = AutoProcessor.from_pretrained(MODEL_ID, use_fast=False)
 
         if torch.cuda.is_available():
             _device = torch.device("cuda")
-            # Prefer 4-bit NF4 quantisation (requires bitsandbytes).
-            # Fall back to bfloat16 when bitsandbytes is not installed.
+            # Load in 4-bit NF4 quantisation (requires bitsandbytes).
+            # This is the primary loading strategy on CUDA – it minimises VRAM
+            # usage while keeping bfloat16 compute precision.
+            # Falls back to plain bfloat16 only when bitsandbytes is unavailable.
             try:
                 from transformers import BitsAndBytesConfig
 
@@ -77,7 +84,8 @@ def _load_model():
                     device_map="auto",
                 )
             except (ImportError, ModuleNotFoundError):
-                # bitsandbytes unavailable – load in bfloat16 directly on CUDA
+                # bitsandbytes is not installed – fall back to bfloat16 on CUDA.
+                # Install bitsandbytes (already in requirements.txt) to enable NF4.
                 _compute_dtype = torch.bfloat16
                 _model = LlavaForConditionalGeneration.from_pretrained(
                     MODEL_ID,
