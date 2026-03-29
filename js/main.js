@@ -339,6 +339,10 @@ class BConfig {
     this.update_url();
   }
 
+  flip_preset() {
+    this.apply_preset(this.target_height, this.target_width);
+  }
+
   toggle_panel(ele) {
     $(".panel.show .options-holder").slideUp(300);
     $(".panel.show").removeClass("show");
@@ -1054,7 +1058,8 @@ class Birme {
   async go_all() {
     if (this.files.length === 0) return;
 
-    const caption_type = document.getElementById("joycaption_type").value;
+    const caption_type  = document.getElementById("joycaption_type").value;
+    const system_prompt = (document.getElementById("joycaption_system_prompt").value || "").trim();
     const btn    = document.getElementById("joycaption-btn");
     const status = document.getElementById("joycaption-status");
 
@@ -1121,7 +1126,7 @@ class Birme {
           const resp = await fetch("/api/caption", {
             method:  "POST",
             headers: { "Content-Type": "application/json" },
-            body:    JSON.stringify({ image: dataUrl, caption_type }),
+            body:    JSON.stringify({ image: dataUrl, caption_type, system_prompt: system_prompt || undefined }),
           });
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           const data = await resp.json();
@@ -1134,7 +1139,6 @@ class Birme {
           f.caption_status = "error";
           failed++;
           console.error("Caption error for", f.base_name, ":", err);
-        }
         this._update_tile_caption(f);
       }
 
@@ -1156,7 +1160,8 @@ class Birme {
   async caption_all() {
     if (this.files.length === 0) return;
 
-    const caption_type = document.getElementById("joycaption_type").value;
+    const caption_type  = document.getElementById("joycaption_type").value;
+    const system_prompt = (document.getElementById("joycaption_system_prompt").value || "").trim();
     const btn    = document.getElementById("joycaption-btn");
     const status = document.getElementById("joycaption-status");
 
@@ -1177,7 +1182,7 @@ class Birme {
         const resp = await fetch("/api/caption", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ image: dataUrl, caption_type }),
+          body: JSON.stringify({ image: dataUrl, caption_type, system_prompt: system_prompt || undefined }),
         });
 
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
