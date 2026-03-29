@@ -28,7 +28,7 @@ _processor = None
 _model_lock = threading.Lock()
 _model_status = "not_loaded"  # not_loaded | loading | ready | error:<msg>
 
-MODEL_ID = "fancyfeast/joy-caption-alpha-two"
+MODEL_ID = "fancyfeast/llama-joycaption-beta-one-hf-llava"
 
 CAPTION_PROMPTS = {
     "descriptive": "Write a descriptive caption for this image in a formal tone.",
@@ -41,23 +41,38 @@ CAPTION_PROMPTS = {
 
 
 def _load_model():
-    """Load the JoyCaption model (called inside _model_lock)."""
+    """Load the JoyCaption model in NF4 4-bit quantisation (called inside _model_lock)."""
     global _model, _processor, _model_status
     _model_status = "loading"
     try:
         import torch
-        from transformers import AutoProcessor, LlavaForConditionalGeneration
+        from transformers import (
+            AutoProcessor,
+            BitsAndBytesConfig,
+            LlavaForConditionalGeneration,
+        )
 
         _processor = AutoProcessor.from_pretrained(MODEL_ID)
-        dtype = torch.float16 if torch.cuda.is_available() else torch.float32
-        device_map = "auto" if torch.cuda.is_available() else None
-        _model = LlavaForConditionalGeneration.from_pretrained(
-            MODEL_ID,
-            torch_dtype=dtype,
-            device_map=device_map,
-        )
-        if not torch.cuda.is_available():
-            _model = _model.to("cpu")
+
+        if torch.cuda.is_available():
+            quantization_config = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_use_double_quant=True,
+            )
+            _model = LlavaForConditionalGeneration.from_pretrained(
+                MODEL_ID,
+                quantization_config=quantization_config,
+                device_map="auto",
+            )
+        else:
+            # NF4 requires CUDA; fall back to float32 on CPU
+            _model = LlavaForConditionalGeneration.from_pretrained(
+                MODEL_ID,
+                torch_dtype=torch.float32,
+            ).to("cpu")
+
         _model.eval()
         _model_status = "ready"
     except Exception as exc:
@@ -159,7 +174,7 @@ def api_caption():
 
         return jsonify({"caption": caption})
 
-    except (ValueError, IOError, RuntimeError, KeyError, TypeError) as exc:
+    except Exception as exc:
         return jsonify({"error": str(exc)}), 500
 
 
