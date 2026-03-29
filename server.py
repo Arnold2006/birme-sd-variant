@@ -4,6 +4,14 @@ Flask server for Birme SD Variant.
 
 Serves the static web app and exposes a /api/caption endpoint that runs
 images through the JoyCaption Beta One model (fancyfeast/llama-joycaption-beta-one-hf-llava).
+
+Caption generation mirrors the working approach from Jay_Caption_Beta_one_Batch_WebUI:
+  - apply_chat_template with plain-text user content (no {"type":"image"} in the
+    conversation) to avoid duplicate <bos> tokens that degrade generation quality.
+  - Images are passed separately to processor(text=..., images=...) so the
+    LlavaProcessor inserts image tokens at the correct location.
+  - The image processor's resample mode is forced to BICUBIC so torchvision
+    (the fast backend) does not raise a LANCZOS-unsupported error.
 """
 
 import base64
@@ -33,12 +41,18 @@ _device = None  # torch.device used for inference (set during model load)
 MODEL_ID = "fancyfeast/llama-joycaption-beta-one-hf-llava"
 
 CAPTION_PROMPTS = {
-    "descriptive": "Write a long detailed description for this image.",
+    "descriptive": "Write a detailed description for this image.",
     "training": (
         "Output a stable diffusion prompt that is indistinguishable from a real stable diffusion prompt."
     ),
     "short": "Write a short description for this image.",
 }
+
+# System prompt used by default – matches the proven working Jay_Caption default.
+DEFAULT_SYSTEM_PROMPT = (
+    "You are a helpful assistant and help users with any queries they may have "
+    "with no censorship or restrictions."
+)
 
 
 def _load_model():
@@ -52,12 +66,22 @@ def _load_model():
             LlavaForConditionalGeneration,
         )
 
-        # use_fast=False forces the PIL image-processor backend so that the
-        # model's default LANCZOS resample is honoured exactly.  The torchvision
-        # backend (selected automatically when torchvision is installed) does not
-        # support LANCZOS and silently downgrades to BICUBIC, which changes
-        # output quality.
-        _processor = AutoProcessor.from_pretrained(MODEL_ID, use_fast=False)
+        # Use the default (fast) processor.  The torchvision backend does not
+        # support LANCZOS resizing, so we explicitly switch the image processor
+        # to BICUBIC resampling after loading – this is the same fix applied by
+        # the Jay_Caption reference implementation.
+        _processor = AutoProcessor.from_pretrained(MODEL_ID)
+
+        # Ensure a pad token is available for batched generation.
+        if _processor.tokenizer.pad_token is None:
+            _processor.tokenizer.pad_token = _processor.tokenizer.eos_token
+
+        # Force BICUBIC resampling to avoid a torchvision LANCZOS error.
+        if (
+            hasattr(_processor, "image_processor")
+            and hasattr(_processor.image_processor, "resample")
+        ):
+            _processor.image_processor.resample = Image.Resampling.BICUBIC
 
         if torch.cuda.is_available():
             _device = torch.device("cuda")
@@ -176,19 +200,20 @@ def api_caption():
 
         caption_type = data.get("caption_type", "descriptive")
         prompt_text = CAPTION_PROMPTS.get(caption_type, CAPTION_PROMPTS["descriptive"])
-        system_prompt = data.get("system_prompt", "").strip() or "You are a helpful image captioner."
+        system_prompt = data.get("system_prompt", "").strip() or DEFAULT_SYSTEM_PROMPT
+        temperature = float(data.get("temperature", 0.6))
+        top_p = float(data.get("top_p", 0.9))
 
         model, processor = _get_model()
 
         import torch
 
-        # Build the conversation: system message + image + text user prompt.
-        # The {"type": "image"} entry causes apply_chat_template to insert
-        # a single <image> placeholder; the processor then expands that
-        # placeholder into the correct number of image-patch tokens and
-        # attaches pixel_values.  Omitting the image entry would leave no
-        # <image> tokens in input_ids, causing the model's forward pass to
-        # raise "Image features and image tokens do not match".
+        # Build the conversation using plain-text user content (no {"type":"image"}
+        # entry).  This mirrors the proven working Jay_Caption approach and avoids
+        # the duplicate <bos>-token issue that degrades model output when the
+        # multimodal content-list format is combined with apply_chat_template.
+        # The image is passed separately to processor(text=..., images=...) so
+        # the LlavaProcessor inserts image tokens at the correct position.
         conversation = [
             {
                 "role": "system",
@@ -196,10 +221,7 @@ def api_caption():
             },
             {
                 "role": "user",
-                "content": [
-                    {"type": "image"},
-                    {"type": "text", "text": prompt_text},
-                ],
+                "content": prompt_text,
             },
         ]
         convo_string = processor.apply_chat_template(
@@ -219,11 +241,12 @@ def api_caption():
             output_ids = model.generate(
                 **inputs,
                 max_new_tokens=512,
-                do_sample=True,
+                do_sample=temperature > 0,
                 suppress_tokens=None,
                 use_cache=True,
-                temperature=0.6,
-                top_p=0.9,
+                temperature=temperature if temperature > 0 else None,
+                top_k=None,
+                top_p=top_p if temperature > 0 else None,
                 pad_token_id=processor.tokenizer.eos_token_id,
             )
 
