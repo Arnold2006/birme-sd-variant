@@ -182,10 +182,13 @@ def api_caption():
 
         import torch
 
-        # Build the conversation: system message + plain text user prompt.
-        # WARNING: HF's handling of chats on LLaVA models is fragile.
-        # Do NOT put {"type": "image"} in the conversation content – pass the
-        # image directly to processor() instead to avoid double image tokens.
+        # Build the conversation: system message + image + text user prompt.
+        # The {"type": "image"} entry causes apply_chat_template to insert
+        # a single <image> placeholder; the processor then expands that
+        # placeholder into the correct number of image-patch tokens and
+        # attaches pixel_values.  Omitting the image entry would leave no
+        # <image> tokens in input_ids, causing the model's forward pass to
+        # raise "Image features and image tokens do not match".
         conversation = [
             {
                 "role": "system",
@@ -193,7 +196,10 @@ def api_caption():
             },
             {
                 "role": "user",
-                "content": prompt_text,
+                "content": [
+                    {"type": "image"},
+                    {"type": "text", "text": prompt_text},
+                ],
             },
         ]
         convo_string = processor.apply_chat_template(
@@ -201,8 +207,6 @@ def api_caption():
         )
         assert isinstance(convo_string, str)
 
-        # Pass text as a list and image separately – the processor inserts the
-        # image tokens automatically.
         inputs = processor(
             text=[convo_string], images=[image], return_tensors="pt"
         ).to(_device)
@@ -220,6 +224,7 @@ def api_caption():
                 use_cache=True,
                 temperature=0.6,
                 top_p=0.9,
+                pad_token_id=processor.tokenizer.eos_token_id,
             )
 
         # Trim the prompt tokens from the front of the output.
