@@ -27,6 +27,7 @@ _model = None
 _processor = None
 _model_lock = threading.Lock()
 _model_status = "not_loaded"  # not_loaded | loading | ready | error:<msg>
+_compute_dtype = None  # dtype used for pixel_values (set during model load)
 
 MODEL_ID = "fancyfeast/llama-joycaption-beta-one-hf-llava"
 
@@ -42,7 +43,7 @@ CAPTION_PROMPTS = {
 
 def _load_model():
     """Load the JoyCaption model in NF4 4-bit quantisation (called inside _model_lock)."""
-    global _model, _processor, _model_status
+    global _model, _processor, _model_status, _compute_dtype
     _model_status = "loading"
     try:
         import torch
@@ -55,10 +56,11 @@ def _load_model():
         _processor = AutoProcessor.from_pretrained(MODEL_ID)
 
         if torch.cuda.is_available():
+            _compute_dtype = torch.float16
             quantization_config = BitsAndBytesConfig(
                 load_in_4bit=True,
                 bnb_4bit_quant_type="nf4",
-                bnb_4bit_compute_dtype=torch.float16,
+                bnb_4bit_compute_dtype=_compute_dtype,
                 bnb_4bit_use_double_quant=True,
             )
             _model = LlavaForConditionalGeneration.from_pretrained(
@@ -68,6 +70,7 @@ def _load_model():
             )
         else:
             # NF4 requires CUDA; fall back to float32 on CPU
+            _compute_dtype = torch.float32
             _model = LlavaForConditionalGeneration.from_pretrained(
                 MODEL_ID,
                 torch_dtype=torch.float32,
@@ -155,10 +158,21 @@ def api_caption():
                 ],
             }
         ]
-        prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
-        inputs = processor(images=image, text=prompt, return_tensors="pt").to(
-            model.device
+        # tokenize=False returns a plain string; without it the default is
+        # tokenize=True which returns token IDs and breaks processor() below.
+        prompt = processor.apply_chat_template(
+            conversation, add_generation_prompt=True, tokenize=False
         )
+
+        # model.device is 'meta' when device_map="auto" is used; derive the
+        # real device from the first parameter instead.
+        device = next(model.parameters()).device
+        inputs = processor(images=image, text=prompt, return_tensors="pt").to(device)
+
+        # Cast pixel_values to the model's compute dtype on CUDA to avoid
+        # dtype mismatches with 4-bit quantised weights.
+        if device.type == "cuda":
+            inputs["pixel_values"] = inputs["pixel_values"].to(_compute_dtype)
 
         with torch.no_grad():
             output_ids = model.generate(
