@@ -114,6 +114,14 @@ def api_status():
     return jsonify({"pinokio": True, "model_status": _model_status})
 
 
+@app.route("/api/preload", methods=["POST"])
+def api_preload():
+    """Start loading the JoyCaption model in the background if not already loading."""
+    if _model_status == "not_loaded":
+        threading.Thread(target=_get_model, daemon=True).start()
+    return jsonify({"model_status": _model_status})
+
+
 @app.route("/api/caption", methods=["POST"])
 def api_caption():
     """

@@ -1044,6 +1044,114 @@ class Birme {
     }
   }
 
+  /**
+   * Full GO workflow:
+   *   1. Trigger model pre-loading via /api/preload
+   *   2. Poll /api/status until the model is ready
+   *   3. Caption every image using the current crop settings
+   *   4. Save all cropped images + .txt caption files as a ZIP
+   */
+  async go_all() {
+    if (this.files.length === 0) return;
+
+    const caption_type = document.getElementById("joycaption_type").value;
+    const btn    = document.getElementById("joycaption-btn");
+    const status = document.getElementById("joycaption-status");
+
+    btn.disabled = true;
+    try {
+      // ── Step 1: trigger model pre-loading ────────────────────────────────
+      status.textContent = "Checking model…";
+      try {
+        await fetch("/api/preload", { method: "POST" });
+      } catch (err) {
+        console.debug("Preload request failed (server may not support it yet):", err.message);
+      }
+
+      // ── Step 2: poll until ready ──────────────────────────────────────────
+      const POLL_INTERVAL_MS = 3000;
+      const MAX_WAIT_MS      = 15 * 60 * 1000; // 15 minutes
+      const deadline         = Date.now() + MAX_WAIT_MS;
+      let   modelReady       = false;
+
+      while (!modelReady) {
+        if (Date.now() > deadline) throw new Error("Model loading timed out (15 min)");
+
+        let mstatus;
+        try {
+          const r = await fetch("/api/status");
+          const d = await r.json();
+          mstatus = d.model_status;
+        } catch (err) {
+          throw new Error(`Cannot reach server — is it running? (${err.message})`);
+        }
+
+        if (mstatus === "ready") {
+          modelReady = true;
+        } else if (mstatus && mstatus.startsWith("error:")) {
+          throw new Error(mstatus);
+        } else {
+          // "not_loaded" or "loading"
+          if (mstatus === "not_loaded") {
+            try { await fetch("/api/preload", { method: "POST" }); } catch (_) {}
+            status.textContent = "Downloading model — this may take a few minutes…";
+          } else {
+            status.textContent = "Model loading — this may take a few minutes…";
+          }
+          await new Promise(r => setTimeout(r, POLL_INTERVAL_MS));
+        }
+      }
+
+      // ── Step 3: caption all images ────────────────────────────────────────
+      const total = this.files.length;
+      let captioned = 0;
+      let failed    = 0;
+
+      for (let i = 0; i < this.files.length; i++) {
+        const f = this.files[i];
+        f.caption_status = "loading";
+        this._update_tile_caption(f);
+        status.textContent = `Captioning ${i + 1} / ${total}…`;
+
+        try {
+          const canvas  = this._make_crop_canvas(f);
+          const dataUrl = canvas ? canvas.toDataURL("image/jpeg", 0.85) : null;
+          if (!dataUrl) throw new Error("Image not loaded");
+
+          const resp = await fetch("/api/caption", {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ image: dataUrl, caption_type }),
+          });
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const data = await resp.json();
+          if (data.error) throw new Error(data.error);
+
+          f.caption        = data.caption;
+          f.caption_status = "done";
+          captioned++;
+        } catch (err) {
+          f.caption_status = "error";
+          failed++;
+          console.error("Caption error for", f.base_name, ":", err);
+        }
+        this._update_tile_caption(f);
+      }
+
+      // ── Step 4: save cropped images + .txt files as ZIP ───────────────────
+      const summary = `Captioned ${captioned}${failed ? `, ${failed} failed` : ""} — saving ZIP…`;
+      status.textContent = summary;
+      // Ensure captions are written into the archive
+      document.getElementById("joycaption_include").checked = true;
+      this.save_all(true);
+
+    } catch (err) {
+      status.textContent = `Error: ${err.message}`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   /** Caption all loaded images in sequence, updating the status line. */
   async caption_all() {
     if (this.files.length === 0) return;
